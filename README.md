@@ -4,7 +4,7 @@ Adds a configurable share of **the experience the player gains** to the
 Pokémon in their party: mob kills, experience bottles, furnaces, trading,
 fishing, and so on. Not battle experience settlement.
 
-At the default 300%, 100 player XP gives each target Pokémon 300 XP.
+At the default 300%, 1 player XP gives each target Pokémon 3 XP.
 
 ## Requirements
 
