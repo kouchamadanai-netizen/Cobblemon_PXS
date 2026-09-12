@@ -1,0 +1,10 @@
+pluginManagement {
+    repositories {
+        // Plugin repositories: ModDevGradle, Minotaur and CurseForgeGradle all resolve from here.
+        gradlePluginPortal()
+        mavenCentral()
+        maven { name = 'NeoForged'; url = 'https://maven.neoforged.net/releases' }
+    }
+}
+
+rootProject.name = 'cobblemon-levelshare'

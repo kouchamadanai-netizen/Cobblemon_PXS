@@ -1,0 +1,145 @@
+// Cobblemon Player XP Share - build script (NeoForge / Minecraft 1.21.1)
+//
+// Cobblemon is a compile-time-only dependency. It is never bundled into the
+// produced jar; at runtime the player's own Cobblemon installation provides it.
+
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version "${moddev_version}"
+    // Publishing to Modrinth / CurseForge. The publish tasks themselves are not
+    // configured here yet, so 'modrinth' / 'curseforge' are not runnable.
+    id 'com.modrinth.minotaur' version '2.9.0'
+    id 'net.darkhax.curseforgegradle' version '1.1.28'
+}
+
+base {
+    archivesName = "${mod_id}-neoforge-${minecraft_version}"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { name = 'NeoForged'; url = 'https://maven.neoforged.net/releases' }
+}
+
+// ---------------------------------------------------------------------------
+// Cobblemon jar resolution
+//
+// Cobblemon is a compile-time-only dependency, so the build needs its jar. It is
+// never downloaded: provide it yourself, either in the project root or in libs/,
+// or point at it with -Pcobblemon_jar=<path>.
+//
+// Order:
+//   1. -Pcobblemon_jar=<path> on the command line
+//   2. any *.jar in the project root whose name contains "cobblemon"
+//   3. any such jar in libs/
+//
+// Never store a jar path in gradle.properties: Gradle reads .properties files as
+// ISO-8859-1, so a non-ASCII file name gets mis-decoded and the dependency fails
+// silently.
+// ---------------------------------------------------------------------------
+
+def resolveCobblemonJar() {
+    if (project.hasProperty('cobblemon_jar')) {
+        def f = file(project.property('cobblemon_jar'))
+        if (!f.exists()) {
+            throw new GradleException("The Cobblemon jar given with -Pcobblemon_jar does not exist: ${f}")
+        }
+        return f
+    }
+    def isCobblemonJar = { File f ->
+        f.isFile() && f.name.toLowerCase().endsWith('.jar') && f.name.toLowerCase().contains('cobblemon')
+    }
+    def candidates = []
+    projectDir.listFiles()?.each { f -> if (isCobblemonJar(f)) { candidates << f } }
+    def libs = new File(projectDir, 'libs')
+    if (libs.isDirectory()) {
+        libs.listFiles()?.each { f -> if (isCobblemonJar(f)) { candidates << f } }
+    }
+    if (candidates.isEmpty()) {
+        throw new GradleException(
+                "No Cobblemon jar found. Compiling against Cobblemon needs its jar; put the\n" +
+                        "Cobblemon ${cobblemon_version} (NeoForge) jar in the project root or in libs/,\n" +
+                        "or point at it with:  -Pcobblemon_jar=<path to the jar>\n" +
+                        "The file name only has to contain \"cobblemon\" and end in .jar.")
+    }
+    return candidates.sort { it.name }.first()
+}
+
+def cobblemonJar = resolveCobblemonJar()
+
+neoForge {
+    version = "${neo_version}"
+
+    addModdingDependenciesTo(sourceSets.main)
+
+    runs {
+        client {
+            client()
+            gameDirectory = file('run/client')
+        }
+        server {
+            server()
+            gameDirectory = file('run/server')
+        }
+    }
+}
+
+dependencies {
+    // Only Cobblemon's type information is needed at compile time.
+    compileOnly files(cobblemonJar)
+
+    // Cobblemon is written in Kotlin, so its classes reference kotlin-stdlib
+    // types (for example PokemonStore implements
+    // kotlin.jvm.internal.markers.KMappedMarker). Without the stdlib on the
+    // compile classpath javac fails with "cannot access KMappedMarker".
+    compileOnly 'org.jetbrains.kotlin:kotlin-stdlib:2.0.21'
+}
+
+// The Cobblemon jar is never fetched by this build: resolveCobblemonJar() above
+// either finds a local copy or fails with instructions on where to put one.
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+// ---------------------------------------------------------------------------
+// Resources: expand the ${} placeholders in neoforge.mods.toml with the values
+// from gradle.properties.
+// ---------------------------------------------------------------------------
+tasks.named('processResources', ProcessResources) {
+    def expandProps = [
+            mod_id           : mod_id,
+            mod_name         : mod_name,
+            mod_license      : mod_license,
+            mod_authors      : mod_authors,
+            mod_description  : mod_description,
+            mod_declaration  : mod_declaration,
+            version          : version,
+            minecraft_version: minecraft_version,
+            neo_version      : neo_version,
+    ]
+    inputs.properties(expandProps)
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand(expandProps)
+    }
+}
+
+tasks.named('jar', Jar) {
+    manifest {
+        attributes([
+                'Specification-Title'   : mod_name,
+                'Specification-Vendor'  : mod_authors,
+                'Specification-Version' : '1',
+                'Implementation-Title'  : mod_name,
+                'Implementation-Version': version,
+                'Implementation-Vendor' : mod_authors,
+        ])
+    }
+}
