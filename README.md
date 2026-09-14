@@ -11,7 +11,6 @@ At the default 300%, 1 player XP gives each target Pokémon 3 XP.
 | | |
 | --- | --- |
 | Minecraft | 1.21.1 |
-| NeoForge | 21.1.x |
 | Cobblemon | 1.6.0+ |
 | Java | 21 |
 
